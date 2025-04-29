@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advanced LED Simulation</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      text-align: center;
+      background: linear-gradient(to right, #f0f4ff, #e0f7fa);
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    canvas {
+      background: #fff;
+      border: 3px solid #333;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+      display: block;
+      margin: 20px auto;
+    }
+    .controls {
+      margin: 10px;
+      background: #fff;
+      padding: 10px;
+      display: inline-block;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .controls label {
+      margin-right: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Advanced LED Simulation</h1>
+
+  <div class="controls">
+    <label><input type="radio" name="bias" value="forward" checked> Forward Bias</label>
+    <label><input type="radio" name="bias" value="unbiased"> Unbiased</label>
+    <label><input type="radio" name="bias" value="reverse"> Reverse Bias</label>
+    <br><br>
+    <label>Band Gap (eV): <span id="bandGapValue">1.9</span></label>
+    <input type="range" id="bandGap" min="1.5" max="3.0" step="0.1" value="1.9">
+  </div>
+
+  <canvas id="ledCanvas" width="900" height="500"></canvas>
+
+  <script>
+    const canvas = document.getElementById("ledCanvas");
+    const ctx = canvas.getContext("2d");
+    const bandGapSlider = document.getElementById("bandGap");
+    const bandGapValue = document.getElementById("bandGapValue");
+    const biasRadios = document.getElementsByName("bias");
+
+    let bandGap = parseFloat(bandGapSlider.value);
+    let bias = "forward";
+    let animationFrame = 0;
+
+    const bandColors = {
+      "1.5": "red",
+      "1.9": "orange",
+      "2.2": "yellow",
+      "2.6": "green",
+      "3.0": "blue"
+    };
+
+    function getLightColor(gap) {
+      let nearest = Object.keys(bandColors).reduce((a, b) =>
+        Math.abs(b - gap) < Math.abs(a - gap) ? b : a
+      );
+      return bandColors[nearest];
+    }
+
+    function drawParticle(x, y, type) {
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, 2 * Math.PI);
+      if (type === 'electron') {
+        ctx.fillStyle = "blue";
+        ctx.fill();
+      } else if (type === 'hole') {
+        ctx.fillStyle = "white";
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+
+    function drawParticles(startX, y, type, direction, visible = true, speed = 400) {
+      if (!visible) return;
+      for (let i = 0; i < 8; i++) {
+        let offset = (animationFrame + i * 40) % speed;
+        let x = direction === 'right' ? startX + offset : startX - offset;
+        let yOffset = Math.sin((animationFrame + i * 10) / 10) * 6;
+        drawParticle(x, y + yOffset, type);
+      }
+    }
+
+    function drawLightBulb(x, y, radius, color) {
+      ctx.save();
+      ctx.translate(x, y);
+      let glow = Math.abs(Math.sin(animationFrame / 10)) * 20 + 25;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius + glow / 5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.shadowBlur = glow;
+      ctx.shadowColor = color;
+      ctx.fill();
+
+      for (let i = 0; i < 8; i++) {
+        let angle = (Math.PI * 2 / 8) * i + animationFrame / 50;
+        let lx = Math.cos(angle) * 40;
+        let ly = Math.sin(angle) * 40;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(lx, ly);
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.5;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+
+      ctx.shadowBlur = 0;
+      ctx.restore();
+    }
+
+    function drawBattery(x, y, polarity) {
+      ctx.fillStyle = '#999';
+      ctx.fillRect(x, y, 20, 80);
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 16px Arial';
+      ctx.fillText(polarity, x + 4, y + 45);
+    }
+
+    function drawLED() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = "#ffdddd";
+      ctx.fillRect(100, 170, 350, 100);
+      ctx.fillStyle = "#ddddff";
+      ctx.fillRect(450, 170, 350, 100);
+
+      ctx.fillStyle = "rgba(0,0,0,0.7)";
+      ctx.font = "bold 18px Arial";
+      ctx.fillText("P-N Junction", 400, 160);
+      ctx.fillStyle = "black";
+      ctx.font = "16px Arial";
+      ctx.fillText("P-type (Holes)", 200, 300);
+      ctx.fillText("N-type (Electrons)", 600, 300);
+      ctx.fillText(`Band gap: ${bandGap.toFixed(1)} eV`, 360, 50);
+      ctx.fillText(`Bias: ${bias}`, 400, 70);
+
+      drawBattery(60, 190, '+');
+      drawBattery(820, 190, '-');
+
+      if (bias === "forward") {
+        drawParticles(100, 210, 'hole', 'right');
+        drawParticles(800, 230, 'electron', 'left');
+        const lightColor = getLightColor(bandGap.toFixed(1));
+        drawLightBulb(450, 110, 20, lightColor);
+        ctx.fillStyle = "#000";
+        ctx.fillText(`Light emitted: ${lightColor}`, 520, 115);
+      } else if (bias === "reverse") {
+        drawParticles(120, 210, 'hole', 'left');
+        drawParticles(780, 230, 'electron', 'right');
+      } else if (bias === "unbiased") {
+        for (let i = 0; i < 4; i++) {
+          let offset = (Math.sin((animationFrame + i * 10) / 20) * 20);
+          drawParticle(380 + offset, 210, 'hole');
+          drawParticle(480 - offset, 230, 'electron');
+        }
+        ctx.strokeStyle = "gray";
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(440, 170, 20, 100);
+        ctx.setLineDash([]);
+      }
+
+      animationFrame++;
+      requestAnimationFrame(drawLED);
+    }
+
+    bandGapSlider.addEventListener("input", () => {
+      bandGap = parseFloat(bandGapSlider.value);
+      bandGapValue.textContent = bandGap.toFixed(1);
+    });
+
+    biasRadios.forEach(radio => {
+      radio.addEventListener("change", () => {
+        bias = document.querySelector("input[name='bias']:checked").value;
+      });
+    });
+
+    drawLED();
+  </script>
+</body>
+</html>
